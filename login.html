@@ -1,0 +1,35 @@
+<!doctype html><html lang="ru"><head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Вход · NiNo</title><link href="./css/style.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+  <script type="module">
+    import { loginUser, getSession } from "./js/db.js";
+    import { el } from "./js/ui.js";
+
+    await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+    if (getSession()) window.location.href="./index.html";
+    const app=document.getElementById("app");
+
+    const msg=el("div",{class:"muted"});
+    const form=el("form",{class:"card row",onsubmit:e=>{
+      e.preventDefault();
+      const login=e.target.login.value.trim();
+      const pass=e.target.pass.value;
+      try {
+        loginUser(login,pass);
+        window.location.href="./index.html";
+      }catch(err){ msg.textContent=err.message||"Ошибка"; }
+    }},[
+      el("b",{},["Вход"]),
+      el("input",{name:"login",class:"input",placeholder:"Логин"}),
+      el("input",{name:"pass",class:"input",type:"password",placeholder:"Пароль"}),
+      el("button",{class:"btn",type:"submit"},["Войти"]),
+      el("a",{href:"./register.html",class:"link"},["Регистрация"])
+    ]);
+    app.append(form,msg);
+  </script>
+</head><body>
+  <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>
+  <main id="app"></main>
+  <footer class="footer">Вход в систему (локально)</footer>
+</body></html>
