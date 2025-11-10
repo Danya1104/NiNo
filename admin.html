@@ -1,0 +1,86 @@
+<!doctype html><html lang="ru"><head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Админ · NiNo</title><link href="./css/style.css" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+  <script type="module">
+    import {query,exec,exportBinary,importBinary} from "./js/db.js"; import {el} from "./js/ui.js";
+    await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+    const app=document.getElementById("app");
+
+    const addAssignment=el("form",{class:"card row",onsubmit:e=>{
+      e.preventDefault();
+      const subject_id=Number(e.target.subj.value),title=e.target.title.value.trim();
+      const due=e.target.due.value||null,link=e.target.link.value||null;
+      if(!subject_id||!title) return alert("Заполните предмет и заголовок");
+      exec(`INSERT INTO assignments(subject_id,title,due_date,link) VALUES (?,?,?,?)`,[subject_id,title,due,link]);
+      alert("Добавлено");
+    }},[
+      el("b",{},["Добавить ДЗ"]),
+      (()=>{
+        const s=el("select",{name:"subj",class:"input"});
+        query("SELECT * FROM subjects").forEach(x=>s.append(el("option",{value:x.id},[x.name])));
+        return s;
+      })(),
+      el("input",{name:"title",class:"input",placeholder:"Заголовок"}),
+      el("input",{name:"due",class:"input",type:"date"}),
+      el("input",{name:"link",class:"input",placeholder:"Ссылка (необязательно)"}),
+      el("button",{class:"btn",type:"submit"},["Сохранить"])
+    ]);
+
+    const addSchedule=el("form",{class:"card row",onsubmit:e=>{
+      e.preventDefault();
+      const group_id=Number(e.target.group.value),subject_id=Number(e.target.subj.value);
+      const day=e.target.day.value,slot=e.target.time.value.trim();
+      if(!group_id||!subject_id||!day||!slot) return alert("Заполните все поля");
+      exec(`INSERT INTO timetable(group_id,subject_id,day,week,slot) VALUES (?,?,?,?,?)`,
+        [group_id,subject_id,day,0,slot]); alert("Добавлено");
+    }},[
+      el("b",{},["Добавить в расписание"]),
+      (()=>{
+        const s=el("select",{name:"group",class:"input"});
+        query("SELECT * FROM groups").forEach(g=>s.append(el("option",{value:g.id},[g.name]))); return s;
+      })(),
+      (()=>{
+        const s=el("select",{name:"subj",class:"input"});
+        query("SELECT * FROM subjects").forEach(x=>s.append(el("option",{value:x.id},[x.name]))); return s;
+      })(),
+      (()=>{
+        const s=el("select",{name:"day",class:"input"});
+        ["mon","tue","wed","thu","fri","sat"].forEach(d=>s.append(el("option",{value:d},[d]))); return s;
+      })(),
+      el("input",{name:"time",class:"input",placeholder:"09:00-10:30"}),
+      el("button",{class:"btn",type:"submit"},["Сохранить"])
+    ]);
+
+    const addStaff=el("form",{class:"card row",onsubmit:e=>{
+      e.preventDefault(); const name=e.target.name.value.trim(),email=e.target.email.value.trim();
+      if(!name||!email) return alert("Заполните поля");
+      exec(`INSERT INTO staff(name,email) VALUES (?,?)`,[name,email]); alert("Добавлено");
+    }},[
+      el("b",{},["Добавить сотрудника"]),
+      el("input",{name:"name",class:"input",placeholder:"ФИО"}),
+      el("input",{name:"email",class:"input",placeholder:"email@uni.edu"}),
+      el("button",{class:"btn",type:"submit"},["Сохранить"])
+    ]);
+
+    const backup=el("div",{class:"card row"},[
+      el("b",{},["Резервные копии"]),
+      (()=>{
+        const b=el("button",{class:"btn"},["Скачать .sqlite"]);
+        b.addEventListener("click",()=>{ const blob=exportBinary(); const a=document.createElement("a");
+          a.href=URL.createObjectURL(blob); a.download="nino.sqlite"; a.click(); });
+        return b;
+      })(),
+      (()=>{
+        const inp=el("input",{type:"file",accept:".sqlite"});
+        inp.addEventListener("change",async()=>{ const f=inp.files[0]; if(!f) return; await importBinary(f); alert("Импортировано"); });
+        return inp;
+      })()
+    ]);
+
+    app.append(addAssignment,addSchedule,addStaff,backup);
+  </script>
+</head><body>
+  <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>
+  <main id="app"></main><footer class="footer">Администрирование</footer>
+</body></html>
