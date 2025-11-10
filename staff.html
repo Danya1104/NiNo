@@ -1,0 +1,22 @@
+<!doctype html><html lang="ru"><head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Почты · NiNo</title><link href="./css/style.css" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+  <script type="module">
+    import {query} from "./js/db.js"; import {el,table} from "./js/ui.js";
+    await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+    const app=document.getElementById("app");
+    const search=el("input",{class:"input",placeholder:"Искать по имени/почте",oninput:()=>draw()});
+    const box=el("div",{class:"card"}); app.append(el("div",{class:"row"},[search]),box);
+    function draw(){
+      const s=(search.value||"").toLowerCase();
+      const rows=query("SELECT * FROM staff ORDER BY name;")
+        .filter(x=>x.name.toLowerCase().includes(s)||x.email.toLowerCase().includes(s))
+        .map((r,i)=>[String(i+1),r.name,r.email]);
+      box.innerHTML=""; box.append(table(["#","ФИО","Почта"],rows.length?rows:[["—","—","—"]]));
+    } draw();
+  </script>
+</head><body>
+  <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>
+  <main id="app"></main><footer class="footer">Справочник контактов</footer>
+</body></html>
