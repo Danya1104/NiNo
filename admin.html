@@ -1,3 +1,11 @@
+import { query, exec, exportBinary, importBinary, getSession } from "./js/db.js";
+
+const u = getSession();
+if (!u || u.role !== "admin") {
+  const app=document.getElementById("app");
+  app.innerHTML='<div class="card">Только для администратора. <a class="link" href="./login.html">Войти</a></div>';
+  throw new Error("Нет доступа");
+}
 <!doctype html><html lang="ru"><head>
   <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Админ · NiNo</title><link href="./css/style.css" rel="stylesheet"/>
