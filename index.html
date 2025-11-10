@@ -1,7 +1,40 @@
 <!doctype html><html lang="ru"><head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>NiNo</title><link href="./css/style.css" rel="stylesheet" />
-</head><body>
+</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+<script type="module">
+  import { getSession, logoutUser } from "./js/db.js";
+  const header=document.querySelector(".topbar");
+  const nav=document.createElement("nav");
+  nav.className="row";
+  nav.innerHTML=`<span id="who" class="muted">гость</span>
+  <a id="loginLink" class="link" href="./login.html">Войти</a>
+  <a id="regLink" class="link" href="./register.html">Регистрация</a>
+  <button id="logoutBtn" class="btn hidden">Выйти</button>`;
+  header.append(nav);
+
+  const who=document.getElementById("who");
+  const loginLink=document.getElementById("loginLink");
+  const regLink=document.getElementById("regLink");
+  const logoutBtn=document.getElementById("logoutBtn");
+
+  function sync(){
+    const u=getSession();
+    if(u){
+      who.textContent=`${u.role} (${u.login})`;
+      logoutBtn.classList.remove("hidden");
+      loginLink.classList.add("hidden"); regLink.classList.add("hidden");
+    }else{
+      who.textContent="гость";
+      logoutBtn.classList.add("hidden");
+      loginLink.classList.remove("hidden"); regLink.classList.remove("hidden");
+    }
+  }
+  logoutBtn.addEventListener("click",()=>{logoutUser();sync();});
+  sync();
+</script>
+<body>
   <header class="topbar"><h1>NiNo</h1></header>
   <main id="app" class="menu">
     <a class="card link" href="./schedule.html">Расписание</a>
