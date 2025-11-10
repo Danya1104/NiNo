@@ -1,0 +1,27 @@
+<!doctype html><html lang="ru"><head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ДЗ · NiNo</title><link href="./css/style.css" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+  <script type="module">
+    import {query} from "./js/db.js"; import {el,table} from "./js/ui.js";
+    await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+    const app=document.getElementById("app");
+    const row=el("div",{class:"row"},[
+      el("label",{},["Предмет: "]),
+      (()=>{const s=el("select"); s.append(el("option",{value:"0"},["Все"])); query("SELECT * FROM subjects").forEach(x=>s.append(el("option",{value:x.id},[x.name]))); s.addEventListener("change",draw); return s;})()
+    ]);
+    const box=el("div",{class:"card"}); app.append(row,box);
+    function draw(){
+      const sid=row.querySelector("select").value;
+      const sql=sid==="0"
+        ? `SELECT s.name subject,a.title,a.due_date,a.link FROM assignments a JOIN subjects s ON s.id=a.subject_id ORDER BY a.due_date`
+        : `SELECT s.name subject,a.title,a.due_date,a.link FROM assignments a JOIN subjects s ON s.id=a.subject_id WHERE a.subject_id=? ORDER BY a.due_date`;
+      const params=sid==="0"?[]:[sid];
+      const rows=query(sql,params).map((r,i)=>[String(i+1),r.subject,r.title,r.due_date||"",r.link?"↗":""]);
+      box.innerHTML=""; box.append(table(["#","Предмет","Задание","Срок","Ссылка"],rows.length?rows:[["—","—","—","—","—"]]));
+    } draw();
+  </script>
+</head><body>
+  <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>
+  <main id="app"></main><footer class="footer">Домашние задания</footer>
+</body></html>
