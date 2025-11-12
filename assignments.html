@@ -1,25 +1,43 @@
 <!doctype html><html lang="ru"><head>
   <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>ДЗ · NiNo</title><link href="./style.css" rel="stylesheet"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
-  <script type="module">
-  import {query} from "./db.js"; import {el,table} from "./ui.js";
-    await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
-    const app=document.getElementById("app");
+  <script src="./db.js"></script>
+  <script src="./ui.js"></script>
+  <script>
+  (async ()=>{
+  await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+  await window.storageReady;
+  const {el,table,getSubjects,getAssignments,addAssignment:storageAddAssignment} = window;
+  const app=document.getElementById("app");
+
+    // Add-assignment form (inline on page)
+    const inlineAdd = el("form",{class:"card row",onsubmit:e=>{e.preventDefault();
+      const subject_id = Number(e.target.subj.value), title = e.target.title.value.trim();
+      const due = e.target.due.value||null, link = e.target.link.value||null;
+      if(!subject_id||!title) return alert('Заполните предмет и заголовок');
+      storageAddAssignment({subject_id,title,due_date:due,link});
+      e.target.title.value=''; e.target.due.value=''; e.target.link.value='';
+      alert('Добавлено'); draw();
+    }},[
+      el('b',{},['Добавить ДЗ']),
+      (()=>{const s=el('select',{name:'subj',class:'input'}); getSubjects().forEach(x=>s.append(el('option',{value:x.id},[x.name]))); return s;})(),
+      el('input',{name:'title',class:'input',placeholder:'Заголовок'}),
+      el('input',{name:'due',class:'input',type:'date'}),
+      el('input',{name:'link',class:'input',placeholder:'Ссылка (необязательно)'}),
+      el('button',{class:'btn',type:'submit'},['Добавить'])
+    ]);
+
     const row=el("div",{class:"row"},[
       el("label",{},["Предмет: "]),
-      (()=>{const s=el("select"); s.append(el("option",{value:"0"},["Все"])); query("SELECT * FROM subjects").forEach(x=>s.append(el("option",{value:x.id},[x.name]))); s.addEventListener("change",draw); return s;})()
+      (()=>{const s=el("select"); s.append(el("option",{value:"0"},["Все"])); getSubjects().forEach(x=>s.append(el("option",{value:x.id},[x.name]))); s.addEventListener("change",draw); return s;})()
     ]);
-    const box=el("div",{class:"card"}); app.append(row,box);
+    const box=el("div",{class:"card"}); app.append(inlineAdd,row,box);
     function draw(){
       const sid=row.querySelector("select").value;
-      const sql=sid==="0"
-        ? `SELECT s.name subject,a.title,a.due_date,a.link FROM assignments a JOIN subjects s ON s.id=a.subject_id ORDER BY a.due_date`
-        : `SELECT s.name subject,a.title,a.due_date,a.link FROM assignments a JOIN subjects s ON s.id=a.subject_id WHERE a.subject_id=? ORDER BY a.due_date`;
-      const params=sid==="0"?[]:[sid];
-      const rows=query(sql,params).map((r,i)=>[String(i+1),r.subject,r.title,r.due_date||"",r.link?"↗":""]);
+      const rows = getAssignments(sid==="0"?null:sid).map((r,i)=>[String(i+1),r.subject,r.title,r.due_date||"",r.link?"↗":""]);
       box.innerHTML=""; box.append(table(["#","Предмет","Задание","Срок","Ссылка"],rows.length?rows:[["—","—","—","—","—"]]));
     } draw();
+  })();
   </script>
 </head><body>
   <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>

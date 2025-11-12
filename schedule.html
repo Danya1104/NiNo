@@ -1,27 +1,42 @@
 <!doctype html><html lang="ru"><head>
   <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Расписание · NiNo</title><link href="./style.css" rel="stylesheet"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
-  <script type="module">
-  import {query} from "./db.js"; import {el,table} from "./ui.js";
+  <script src="./db.js"></script>
+  <script src="./ui.js"></script>
+  <script>
+  (async ()=>{
     await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+    await window.storageReady;
+    const {el,table,getGroups,getSubjects,getTimetable,addTimetable:storageAddTimetable} = window;
     const app=document.getElementById("app");
+
+    // Inline add schedule form
+    const inlineAdd = el('form',{class:'card row',onsubmit:e=>{e.preventDefault();
+      const group_id=Number(e.target.group.value), subject_id=Number(e.target.subj.value), day=e.target.day.value, slot=e.target.time.value.trim();
+      if(!group_id||!subject_id||!day||!slot) return alert('Заполните все поля');
+      storageAddTimetable({group_id,subject_id,day,week:0,slot}); e.target.time.value=''; alert('Добавлено'); draw();
+    }},[
+      el('b',{},['Добавить в расписание']),
+      (()=>{const s=el('select',{name:'group',class:'input'}); getGroups().forEach(g=>s.append(el('option',{value:g.id},[g.name]))); return s;})(),
+      (()=>{const s=el('select',{name:'subj',class:'input'}); getSubjects().forEach(x=>s.append(el('option',{value:x.id},[x.name]))); return s;})(),
+      (()=>{const s=el('select',{name:'day',class:'input'}); ['mon','tue','wed','thu','fri','sat'].forEach(d=>s.append(el('option',{value:d},[d]))); return s;})(),
+      el('input',{name:'time',class:'input',placeholder:'09:00-10:30'}),
+      el('button',{class:'btn',type:'submit'},['Добавить'])
+    ]);
+
     const filters=el("div",{class:"row"},[
       el("label",{},["Группа: "]),
-      (()=>{const s=el("select"); query("SELECT * FROM groups").forEach(g=>s.append(el("option",{value:g.id},[g.name]))); s.addEventListener("change",draw); return s;})(),
+      (()=>{const s=el("select"); getGroups().forEach(g=>s.append(el("option",{value:g.id},[g.name]))); s.addEventListener("change",draw); return s;})(),
       el("label",{},["День: "]),
       (()=>{const s=el("select"); ["mon","tue","wed","thu","fri","sat"].forEach(d=>s.append(el("option",{value:d},[d]))); s.addEventListener("change",draw); return s;})()
     ]);
-    const box=el("div",{class:"card"}); app.append(filters,box);
+    const box=el("div",{class:"card"}); app.append(inlineAdd,filters,box);
     function draw(){
       const [gSel,dSel]=filters.querySelectorAll("select");
-      const rows=query(`
-        SELECT s.name subject, t.slot FROM timetable t
-        JOIN subjects s ON s.id=t.subject_id
-        WHERE t.group_id=? AND t.day=? ORDER BY t.slot;
-      `,[gSel.value,dSel.value]).map((r,i)=>[String(i+1),r.subject,r.slot]);
+      const rows=getTimetable(gSel.value,dSel.value).map((r,i)=>[String(i+1),r.subject,r.slot]);
       box.innerHTML=""; box.append(table(["#","Предмет","Время"],rows.length?rows:[["—","—","—"]]));
     } draw();
+  })();
   </script>
 </head><body>
   <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>

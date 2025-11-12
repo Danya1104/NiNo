@@ -1,20 +1,36 @@
 <!doctype html><html lang="ru"><head>
   <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Почты · NiNo</title><link href="./style.css" rel="stylesheet"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
-  <script type="module">
-  import {query} from "./db.js"; import {el,table} from "./ui.js";
+  <script src="./db.js"></script>
+  <script src="./ui.js"></script>
+  <script>
+  (async ()=>{
     await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+    await window.storageReady;
+    const {el,table,getStaff,addStaffEntry:storageAddStaffEntry} = window;
     const app=document.getElementById("app");
+
+    const inlineAdd = el('form',{class:'card row',onsubmit:e=>{e.preventDefault();
+      const name = e.target.name.value.trim(), email = e.target.email.value.trim();
+      if(!name||!email) return alert('Заполните поля');
+      storageAddStaffEntry({name,email}); e.target.name.value=''; e.target.email.value=''; alert('Добавлено'); draw();
+    }},[
+      el('b',{},['Добавить сотрудника']),
+      el('input',{name:'name',class:'input',placeholder:'ФИО'}),
+      el('input',{name:'email',class:'input',placeholder:'email@uni.edu'}),
+      el('button',{class:'btn',type:'submit'},['Добавить'])
+    ]);
+
     const search=el("input",{class:"input",placeholder:"Искать по имени/почте",oninput:()=>draw()});
-    const box=el("div",{class:"card"}); app.append(el("div",{class:"row"},[search]),box);
+    const box=el("div",{class:"card"}); app.append(inlineAdd,el("div",{class:"row"},[search]),box);
     function draw(){
       const s=(search.value||"").toLowerCase();
-      const rows=query("SELECT * FROM staff ORDER BY name;")
+      const rows=getStaff()
         .filter(x=>x.name.toLowerCase().includes(s)||x.email.toLowerCase().includes(s))
         .map((r,i)=>[String(i+1),r.name,r.email]);
       box.innerHTML=""; box.append(table(["#","ФИО","Почта"],rows.length?rows:[["—","—","—"]]));
     } draw();
+  })();
   </script>
 </head><body>
   <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>
