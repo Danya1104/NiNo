@@ -3,22 +3,34 @@
   <title>Админ · NiNo</title><link href="./css/style.css" rel="stylesheet"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
   <script type="module">
-    import {query,exec,exportBinary,importBinary} from "./js/db.js"; import {el} from "./js/ui.js";
-    await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
-    const app=document.getElementById("app");
+    import {query,exec,exportBinary,importBinary,getSession} from "./js/db.js";
+    import {el,table} from "./js/ui.js";
 
+    await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
+
+    // доступ только admin
+    const u=getSession();
+    const app=document.getElementById("app");
+    if(!u||u.role!=="admin"){
+      app.innerHTML='<div class="card">Только для администратора. <a class="link" href="./login.html">Войти</a></div>';
+      throw new Error("forbidden");
+    }
+
+    // ===== формы добавления =====
     const addAssignment=el("form",{class:"card row",onsubmit:e=>{
       e.preventDefault();
-      const subject_id=Number(e.target.subj.value),title=e.target.title.value.trim();
-      const due=e.target.due.value||null,link=e.target.link.value||null;
+      const subject_id=Number(e.target.subj.value);
+      const title=e.target.title.value.trim();
+      const due=e.target.due.value||null;
+      const link=e.target.link.value||null;
       if(!subject_id||!title) return alert("Заполните предмет и заголовок");
       exec(`INSERT INTO assignments(subject_id,title,due_date,link) VALUES (?,?,?,?)`,[subject_id,title,due,link]);
-      alert("Добавлено");
+      alert("Добавлено"); renderLists();
     }},[
       el("b",{},["Добавить ДЗ"]),
       (()=>{
         const s=el("select",{name:"subj",class:"input"});
-        query("SELECT * FROM subjects").forEach(x=>s.append(el("option",{value:x.id},[x.name])));
+        query("SELECT * FROM subjects").forEach(x=> s.append(el("option",{value:x.id},[x.name])));
         return s;
       })(),
       el("input",{name:"title",class:"input",placeholder:"Заголовок"}),
@@ -26,36 +38,46 @@
       el("input",{name:"link",class:"input",placeholder:"Ссылка (необязательно)"}),
       el("button",{class:"btn",type:"submit"},["Сохранить"])
     ]);
+    
 
     const addSchedule=el("form",{class:"card row",onsubmit:e=>{
       e.preventDefault();
-      const group_id=Number(e.target.group.value),subject_id=Number(e.target.subj.value);
-      const day=e.target.day.value,slot=e.target.time.value.trim();
+      const group_id=Number(e.target.group.value);
+      const subject_id=Number(e.target.subj.value);
+      const day=e.target.day.value;
+      const slot=e.target.time.value.trim();
       if(!group_id||!subject_id||!day||!slot) return alert("Заполните все поля");
       exec(`INSERT INTO timetable(group_id,subject_id,day,week,slot) VALUES (?,?,?,?,?)`,
-        [group_id,subject_id,day,0,slot]); alert("Добавлено");
+           [group_id,subject_id,day,0,slot]);
+      alert("Добавлено"); renderLists();
     }},[
       el("b",{},["Добавить в расписание"]),
       (()=>{
         const s=el("select",{name:"group",class:"input"});
-        query("SELECT * FROM groups").forEach(g=>s.append(el("option",{value:g.id},[g.name]))); return s;
+        query("SELECT * FROM groups").forEach(g=> s.append(el("option",{value:g.id},[g.name])));
+        return s;
       })(),
       (()=>{
         const s=el("select",{name:"subj",class:"input"});
-        query("SELECT * FROM subjects").forEach(x=>s.append(el("option",{value:x.id},[x.name]))); return s;
+        query("SELECT * FROM subjects").forEach(x=> s.append(el("option",{value:x.id},[x.name])));
+        return s;
       })(),
       (()=>{
         const s=el("select",{name:"day",class:"input"});
-        ["mon","tue","wed","thu","fri","sat"].forEach(d=>s.append(el("option",{value:d},[d]))); return s;
+        ["mon","tue","wed","thu","fri","sat"].forEach(d=> s.append(el("option",{value:d},[d])));
+        return s;
       })(),
       el("input",{name:"time",class:"input",placeholder:"09:00-10:30"}),
       el("button",{class:"btn",type:"submit"},["Сохранить"])
     ]);
 
     const addStaff=el("form",{class:"card row",onsubmit:e=>{
-      e.preventDefault(); const name=e.target.name.value.trim(),email=e.target.email.value.trim();
+      e.preventDefault();
+      const name=e.target.name.value.trim();
+      const email=e.target.email.value.trim();
       if(!name||!email) return alert("Заполните поля");
-      exec(`INSERT INTO staff(name,email) VALUES (?,?)`,[name,email]); alert("Добавлено");
+      exec(`INSERT INTO staff(name,email) VALUES (?,?)`,[name,email]);
+      alert("Добавлено"); renderLists();
     }},[
       el("b",{},["Добавить сотрудника"]),
       el("input",{name:"name",class:"input",placeholder:"ФИО"}),
@@ -63,24 +85,157 @@
       el("button",{class:"btn",type:"submit"},["Сохранить"])
     ]);
 
+    // ===== списки + edit/delete =====
+    const listsWrap=el("div",{class:"card"});
+    function btn(label,fn){ return el("button",{class:"btn",onclick:fn},[label]); }
+    
+
+    function renderAssignmentsList(){
+      const data=query(`SELECT a.id, s.name subject, a.title, a.due_date, a.link
+                        FROM assignments a JOIN subjects s ON s.id=a.subject_id
+                        ORDER BY a.due_date;`);
+      if(!data.length) return el("div",{class:"muted"},["ДЗ — нет данных"]);
+      const rows=data.map(r=>{
+        const actions=el("div",{class:"row"},[
+          btn("Edit",()=>editAssignment(r.id)),
+          btn("Delete",()=>delAssignment(r.id))
+        ]);
+        return [String(r.id), r.subject, r.title, r.due_date||"", r.link||"", actions];
+      });
+      return el("div",{},[
+        el("h3",{},["Домашние задания"]),
+        table(["ID","Предмет","Задание","Срок","Ссылка","Действия"], rows)
+      ]);
+    }
+    function renderStaffList(){
+      const data=query(`SELECT id, name, email FROM staff ORDER BY name;`);
+      if(!data.length) return el("div",{class:"muted"},["Сотрудники — нет данных"]);
+      const rows=data.map(r=>{
+        const actions=el("div",{class:"row"},[
+          btn("Edit",()=>editStaff(r.id)),
+          btn("Delete",()=>delStaff(r.id))
+        ]);
+        return [String(r.id), r.name, r.email, actions];
+      });
+      return el("div",{},[
+        el("h3",{},["Сотрудники"]),
+        table(["ID","ФИО","Почта","Действия"], rows)
+      ]);
+    }
+    function renderTimetableList(){
+      const data=query(`
+        SELECT t.id, g.name as grp, s.name as subj, t.day, t.slot
+        FROM timetable t
+        JOIN groups g ON g.id=t.group_id
+        JOIN subjects s ON s.id=t.subject_id
+        ORDER BY g.name, t.day, t.slot;`);
+      if(!data.length) return el("div",{class:"muted"},["Расписание — нет данных"]);
+      const rows=data.map(r=>{
+        const actions=el("div",{class:"row"},[
+          btn("Edit",()=>editTimetable(r.id)),
+          btn("Delete",()=>delTimetable(r.id))
+        ]);
+        return [String(r.id), r.grp, r.subj, r.day, r.slot, actions];
+      });
+      return el("div",{},[
+        el("h3",{},["Расписание"]),
+        table(["ID","Группа","Предмет","День","Время","Действия"], rows)
+      ]);
+    }
+
+    // ===== обработчики Delete =====
+    function delAssignment(id){
+      if(!confirm("Удалить ДЗ #"+id+"?")) return;
+      exec(`DELETE FROM assignments WHERE id=?`,[id]); renderLists();
+    }
+    function delStaff(id){
+      if(!confirm("Удалить сотрудника #"+id+"?")) return;
+      exec(`DELETE FROM staff WHERE id=?`,[id]); renderLists();
+    }
+    function delTimetable(id){
+      if(!confirm("Удалить строку расписания #"+id+"?")) return;
+      exec(`DELETE FROM timetable WHERE id=?`,[id]); renderLists();
+    }
+
+    // ===== обработчики Edit (через простые prompt) =====
+    function editAssignment(id){
+      const row=query(`SELECT * FROM assignments WHERE id=?`,[id])[0];
+      if(!row) return alert("Не найдено");
+      const title=prompt("Заголовок", row.title||"");
+      if(title===null) return;
+      const due=prompt("Срок (YYYY-MM-DD)", row.due_date||"");
+      if(due===null) return;
+      const link=prompt("Ссылка", row.link||"");
+      if(link===null) return;
+      exec(`UPDATE assignments SET title=?, due_date=?, link=? WHERE id=?`,[title,due||null,link||null,id]);
+      renderLists();
+    }
+
+    function editStaff(id){
+      const row=query(`SELECT * FROM staff WHERE id=?`,[id])[0];
+      if(!row) return alert("Не найдено");
+      const name=prompt("ФИО", row.name||"");
+      if(name===null) return;
+      const email=prompt("Почта", row.email||"");
+      if(email===null) return;
+      exec(`UPDATE staff SET name=?, email=? WHERE id=?`,[name,email,id]);
+      renderLists();
+    }
+    
+
+    function editTimetable(id){
+      const row=query(`SELECT * FROM timetable WHERE id=?`,[id])[0];
+      if(!row) return alert("Не найдено");
+      const day=prompt("День (mon..sat)", row.day||"");
+      if(day===null) return;
+      const slot=prompt("Время (09:00-10:30)", row.slot||"");
+      if(slot===null) return;
+      // предмет/группа оставим как есть (проще), можно расширить по желанию
+      exec(`UPDATE timetable SET day=?, slot=? WHERE id=?`,[day,slot,id]);
+      renderLists();
+    }
+
+    // ===== бэкапы =====
     const backup=el("div",{class:"card row"},[
       el("b",{},["Резервные копии"]),
       (()=>{
         const b=el("button",{class:"btn"},["Скачать .sqlite"]);
-        b.addEventListener("click",()=>{ const blob=exportBinary(); const a=document.createElement("a");
-          a.href=URL.createObjectURL(blob); a.download="nino.sqlite"; a.click(); });
+        b.addEventListener("click",()=>{
+          const blob=exportBinary();
+          const a=document.createElement("a");
+          a.href=URL.createObjectURL(blob);
+          a.download="nino.sqlite";
+          a.click();
+        });
         return b;
       })(),
       (()=>{
         const inp=el("input",{type:"file",accept:".sqlite"});
-        inp.addEventListener("change",async()=>{ const f=inp.files[0]; if(!f) return; await importBinary(f); alert("Импортировано"); });
+        inp.addEventListener("change", async ()=>{
+          const f=inp.files[0]; if(!f) return;
+          await importBinary(f);
+          alert("Импортировано"); renderLists();
+        });
         return inp;
       })()
     ]);
 
-    app.append(addAssignment,addSchedule,addStaff,backup);
+    // ===== сборка страницы =====
+    app.append(addAssignment, addSchedule, addStaff, backup, listsWrap);
+
+    function renderLists(){
+      listsWrap.innerHTML="";
+      listsWrap.append(
+        el("div",{class:"card"},[renderAssignmentsList()]),
+        el("div",{class:"card"},[renderStaffList()]),
+        el("div",{class:"card"},[renderTimetableList()])
+      );
+    }
+    renderLists();
   </script>
 </head><body>
   <header class="topbar"><a class="link" href="./index.html">← На главную</a></header>
-  <main id="app"></main><footer class="footer">Администрирование</footer>
+  <main id="app"></main>
+  <footer class="footer">Администрирование · редактирование и удаление</footer>
 </body></html>
+
