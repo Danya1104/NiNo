@@ -1,9 +1,9 @@
 <!doctype html><html lang="ru"><head>
   <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Почты · NiNo</title><link href="./css/style.css" rel="stylesheet"/>
+  <title>Почты · NiNo</title><link href="./style.css" rel="stylesheet"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
   <script type="module">
-    import {query} from "./js/db.js"; import {el,table} from "./js/ui.js";
+  import {query} from "./db.js"; import {el,table} from "./ui.js";
     await new Promise(r=>window.addEventListener("DOMContentLoaded",r));
     const app=document.getElementById("app");
     const search=el("input",{class:"input",placeholder:"Искать по имени/почте",oninput:()=>draw()});
